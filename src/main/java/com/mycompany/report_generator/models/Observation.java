@@ -5,11 +5,13 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Entity
 @Table(name = "observations")
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
 public class Observation {
 
     @Id
@@ -42,10 +44,14 @@ public class Observation {
         this.doctor = doctor;
         this.symptomsDescription = symptomsDescription;
         this.vitalSigns = vitalSigns;
+        this.observationDate = LocalDateTime.now(); // data setată automat
     }
 
-    public String getSymptomsDescription() {
-        return symptomsDescription;
-    }
+    public Patient getPatient() { return patient; }
+    public Doctor getDoctor() { return doctor; }
+    public Map<String, String> getVitalSigns() { return vitalSigns; }
+    public String getSymptomsDescription() { return symptomsDescription; }
+
+
 
 }
