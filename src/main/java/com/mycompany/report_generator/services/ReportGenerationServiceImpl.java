@@ -2,55 +2,65 @@ package com.mycompany.report_generator.services;
 
 import com.mycompany.report_generator.models.Observation;
 import com.mycompany.report_generator.models.ObservationReport;
+import com.mycompany.report_generator.repositories.ObservationReportRepository;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReportGenerationServiceImpl implements ReportGenerationService {
 
-    private final List<RiskEvaluationStrategy> strategies;
+    private final LLMClient llmClient;
+    private final ObservationReportRepository reportRepository;
 
-    public ReportGenerationServiceImpl(List<RiskEvaluationStrategy> strategies) {
-        this.strategies = strategies;
+    public ReportGenerationServiceImpl(
+        LLMClient llmClient,
+        ObservationReportRepository reportRepository
+    ) {
+        this.llmClient = llmClient;
+        this.reportRepository = reportRepository;
     }
 
     @Override
+    @Transactional
     public ObservationReport generateReport(Observation observation) {
-        List<String> allRiskFactors = new ArrayList<>();
+        String llmOutput = llmClient.generateReport("Generare raport simplu.");
 
-        // folosim strategiile injectate
-        for (RiskEvaluationStrategy strategy : strategies) {
-            allRiskFactors.addAll(strategy.evaluate(
-                    observation.getVitalSigns(),
-                    observation.getSymptomsDescription()
-            ));
-        }
+        // Folosește constructorul implicit și settere (logica alternativă)
+        ObservationReport report = new ObservationReport();
 
-        String potentialDiagnosis = determineDiagnosis(allRiskFactors);
+        report.setObservation(observation);
+        report.setReportContent(llmOutput);
 
-        return ObservationReport.builder()
-                .patientName(
-                        observation.getPatient() != null
-                                ? observation.getPatient().getFirstName() + " " + observation.getPatient().getLastName()
-                                : "Placeholder Name")
-                .doctorName(
-                        observation.getDoctor() != null
-                                ? observation.getDoctor().getFirstName() + " " + observation.getDoctor().getLastName()
-                                : "Placeholder Doctor")
-                .observationSummary(observation.getSymptomsDescription())
-                .potentialDiagnosis(potentialDiagnosis)
-                .riskFactors(allRiskFactors)
-                .build();
+        // Populează câmpurile adăugate manual
+        report.setPatientName(
+            observation.getPatient() != null
+                ? observation.getPatient().getFirstName() +
+                  " " +
+                  observation.getPatient().getLastName()
+                : "Pacient Necunoscut"
+        );
+        report.setDoctorName(
+            observation.getDoctor() != null
+                ? observation.getDoctor().getFirstName() +
+                  " " +
+                  observation.getDoctor().getLastName()
+                : "Doctor Necunoscut"
+        );
+
+        report.setPotentialDiagnosis(
+            "Default Diagnosis (din serviciul simplu)"
+        );
+        report.setRiskLevel("Low");
+        report.setGenerationDate(LocalDateTime.now());
+
+        return reportRepository.save(report);
     }
 
-
-    private String determineDiagnosis(List<String> risks) {
-        if(risks.contains("High Blood Pressure") && risks.contains("High Heart Rate")) return "Cardiovascular Risk";
-        if(risks.contains("High Blood Pressure")) return "Hypertension Risk";
-        if(risks.contains("High Heart Rate")) return "Cardiac Risk";
-        return "Normal";
+    private String buildPromptFromObservation(Observation obs) {
+        return (
+            "Generic report request for observation: " +
+            obs.getSymptomsDescription()
+        );
     }
 }

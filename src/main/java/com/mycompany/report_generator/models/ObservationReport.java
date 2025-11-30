@@ -1,75 +1,35 @@
-
 package com.mycompany.report_generator.models;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Entity
+@Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class ObservationReport {
 
-    private final String patientName;
-    private final String doctorName;
-    private final String observationSummary;
-    private final String potentialDiagnosis;
-    private final Map<String, String> vitalSigns;
-    private final List<String> riskFactors;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    private ObservationReport(ObservationReportBuilder builder) {
-        this.patientName = builder.patientName;
-        this.doctorName = builder.doctorName;
-        this.observationSummary = builder.observationSummary;
-        this.potentialDiagnosis = builder.potentialDiagnosis;
-        this.vitalSigns = builder.vitalSigns;
-        this.riskFactors = builder.riskFactors;
-    }
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "observation_id", unique = true)
+    private Observation observation;
 
-    public String getPatientName() { return patientName; }
-    public String getDoctorName() { return doctorName; }
-    public String getObservationSummary() { return observationSummary; }
-    public String getPotentialDiagnosis() { return potentialDiagnosis; }
-    public Map<String, String> getVitalSigns() { return vitalSigns; }
-    public List<String> getRiskFactors() { return riskFactors; }
+    private String patientName;
+    private String doctorName;
 
-    public static ObservationReportBuilder builder() {
-        return new ObservationReportBuilder();
-    }
+    @Column(columnDefinition = "TEXT")
+    private String reportContent;
 
-    public static class ObservationReportBuilder {
-        private String patientName;
-        private String doctorName;
-        private String observationSummary;
-        private String potentialDiagnosis;
-        private Map<String, String> vitalSigns;
-        private List<String> riskFactors;
+    private String potentialDiagnosis;
+    private String riskLevel;
 
-        private ObservationReportBuilder() {}
-
-        public ObservationReportBuilder patientName(String patientName) {
-            this.patientName = patientName;
-            return this;
-        }
-        public ObservationReportBuilder doctorName(String doctorName) {
-            this.doctorName = doctorName;
-            return this;
-        }
-        public ObservationReportBuilder observationSummary(String observationSummary) {
-            this.observationSummary = observationSummary;
-            return this;
-        }
-        public ObservationReportBuilder potentialDiagnosis(String potentialDiagnosis) {
-            this.potentialDiagnosis = potentialDiagnosis;
-            return this;
-        }
-        public ObservationReportBuilder vitalSigns(Map<String, String> vitalSigns) {
-            this.vitalSigns = vitalSigns;
-            return this;
-        }
-        public ObservationReportBuilder riskFactors(List<String> riskFactors) {
-            this.riskFactors = riskFactors;
-            return this;
-        }
-
-        public ObservationReport build() {
-            return new ObservationReport(this);
-        }
-    }
+    private LocalDateTime generationDate = LocalDateTime.now();
 }
