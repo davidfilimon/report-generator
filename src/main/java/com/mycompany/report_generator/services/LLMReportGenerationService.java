@@ -3,14 +3,14 @@ package com.mycompany.report_generator.services;
 import com.mycompany.report_generator.models.Observation;
 import com.mycompany.report_generator.models.ObservationReport;
 import com.mycompany.report_generator.repositories.ObservationReportRepository;
-import com.mycompany.report_generator.services.LLMClient; // Am presupus că LLMClient se află în 'utils'
+import com.mycompany.report_generator.services.LLMClient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.google.gson.Gson; // NOU: Import pentru parsarea JSON
+import com.google.gson.Gson;
 
 @Primary
 @Service
@@ -18,12 +18,13 @@ public class LLMReportGenerationService implements ReportGenerationService {
 
     private final LLMClient llmClient;
     private final ObservationReportRepository reportRepository;
-    private final Gson gson = new Gson(); // Instanță Gson
+    private final Gson gson = new Gson();
 
+    // NOU: Structură plată, simplă, care se potrivește cu schema JSON trimisă către Gemini
     private static class LLMResponse {
-        String diagnosis; // Diagnoză potențială
-        String risk;      // Nivel de risc (Scăzut, Mediu, Înalt, Critic)
-        String analysis;  // Analiza explicativă (devine reportContent)
+        String diagnosis;   // Diagnoză potențială (String)
+        String riskLevel;   // Nivel de risc (Scăzut, Mediu, Înalt, Critic) (String)
+        String analysis;    // Analiza explicativă (devine reportContent) (String)
     }
 
     public LLMReportGenerationService(
@@ -38,6 +39,7 @@ public class LLMReportGenerationService implements ReportGenerationService {
     @Transactional
     public ObservationReport generateReport(Observation observation) {
 
+        // UPSERT: Ștergem raportul vechi înainte de a salva unul nou.
         if (observation.getId() != null) {
             reportRepository.deleteByObservationId(observation.getId());
         }
@@ -55,27 +57,39 @@ public class LLMReportGenerationService implements ReportGenerationService {
                     .build();
         }
 
-        String llmOutput = llmClient.generateReport(inputPrompt);
+        // Răspunsul LLM este garantat a fi un String JSON pur (grație Gemini Structured Output)
+        String jsonOutput = llmClient.generateReport(inputPrompt);
+
+        // Verificăm dacă LLMClient a raportat o eroare (ex: cheie API lipsă sau eroare de rețea)
+        if (jsonOutput.startsWith("Eroare")) {
+            return ObservationReport.builder()
+                    .patientName("Eroare API")
+                    .doctorName("Sistem")
+                    .reportContent(jsonOutput)
+                    .potentialDiagnosis("Eroare de Conectare")
+                    .riskLevel("Critic")
+                    .generationDate(LocalDateTime.now())
+                    .build();
+        }
 
         LLMResponse llmResponse;
 
         try {
-            // Încercăm să extragem și să mapăm răspunsul JSON
-            // Uneori, LLM adaugă text suplimentar. Încercăm să izolăm obiectul JSON.
-            int start = llmOutput.indexOf('{');
-            int end = llmOutput.lastIndexOf('}');
-            String jsonContent = (start != -1 && end != -1) ? llmOutput.substring(start, end + 1) : llmOutput;
+            // Parsare directă și simplă, fără manipularea String-urilor
+            llmResponse = gson.fromJson(jsonOutput, LLMResponse.class);
 
-            llmResponse = gson.fromJson(jsonContent, LLMResponse.class);
+            // Verificare critică de integritate
+            if (llmResponse == null || llmResponse.analysis == null || llmResponse.diagnosis == null || llmResponse.riskLevel == null) {
+                throw new IllegalStateException("Gemini a returnat JSON incomplet, deși schema a fost solicitată.");
+            }
 
         } catch (Exception e) {
-            System.err.println("Eroare la parsarea răspunsului JSON de la LLM. Răspuns brut: " + llmOutput);
-            // În caz de eroare de parsare, returnăm conținutul brut, dar cu eroare vizibilă
+            System.err.println("Eroare la parsarea răspunsului JSON. Răspuns brut: " + jsonOutput + ". Eroare: " + e.getMessage());
             return ObservationReport.builder()
                     .observation(observation)
                     .patientName("Eroare la Parsare")
                     .doctorName("Sistem")
-                    .reportContent("Eroare la parsarea răspunsului LLM. Asigură-te că Ollama returnează JSON. Răspuns brut: " + llmOutput)
+                    .reportContent("Eroare la parsarea răspunsului. Răspuns brut: " + jsonOutput)
                     .potentialDiagnosis("Eroare la Parsare")
                     .riskLevel("Critic")
                     .generationDate(LocalDateTime.now())
@@ -85,32 +99,28 @@ public class LLMReportGenerationService implements ReportGenerationService {
 
         // Extrage Nume Pacient & Doctor
         String patientFullName = observation.getPatient() != null
-                ? observation.getPatient().getFirstName() +
-                " " +
-                observation.getPatient().getLastName()
+                ? observation.getPatient().getFirstName() + " " + observation.getPatient().getLastName()
                 : "Pacient Necunoscut";
 
         String doctorFullName = observation.getDoctor() != null
-                ? observation.getDoctor().getFirstName() +
-                " " +
-                observation.getDoctor().getLastName()
+                ? observation.getDoctor().getFirstName() + " " + observation.getDoctor().getLastName()
                 : "Doctor Necunoscut";
 
         // Creează entitatea ObservationReport folosind datele structurate
         ObservationReport report = ObservationReport.builder()
                 .observation(observation)
-                .reportContent(llmResponse.analysis) // Conținutul analizei structurate
+                .reportContent(llmResponse.analysis) // Analiza explicativă
                 .patientName(patientFullName)
                 .doctorName(doctorFullName)
-                .potentialDiagnosis(llmResponse.diagnosis) // Diagnoza structurată
-                .riskLevel(llmResponse.risk) // Nivelul de risc structurat
+                .potentialDiagnosis(llmResponse.diagnosis) // Diagnoza extrasă
+                .riskLevel(llmResponse.riskLevel) // Nivelul de risc extras
                 .generationDate(LocalDateTime.now())
                 .build();
 
         return reportRepository.save(report);
     }
 
-    // --- Logica de Construire Prompt - Actualizată pentru a cere JSON ---
+    // --- Logica de Construire Prompt - Simplificată ---
 
     private String buildPromptFromObservation(Observation observation) {
         int age = 0;
@@ -126,10 +136,8 @@ public class LLMReportGenerationService implements ReportGenerationService {
             return "Observation missing patient data. Cannot generate report.";
         }
 
-        // Extrage datele Pacientului
         age = calculateAge(observation.getPatient().getBirthDate());
 
-        // Previne NullPointerException
         if (observation.getPatient().getGender() != null) {
             gender = observation.getPatient().getGender().equalsIgnoreCase("M")
                     ? "masculin"
@@ -144,43 +152,21 @@ public class LLMReportGenerationService implements ReportGenerationService {
             medicalHistory = observation.getPatient().getMedicalHistory();
         }
 
-        // Extrage Date Vitale
         String tensiune = observation
                 .getVitalSigns()
                 .getOrDefault("Tensiune Arterială", "N/A");
 
-        // Construiește promptul Llama3 Chat, dar cu instrucțiuni stricte de JSON
         StringBuilder sb = new StringBuilder();
 
-        sb.append("<|system|>\n");
-        sb.append(
-                "Ești un sistem expert medical AI specializat în analiza riscului cardiovascular. " +
-                        "Trebuie să generezi o analiză concisă în format JSON. " +
-                        "Analiza ta va include un diagnostic potențial (diagnosis), un nivel de risc (risk: Scăzut/Mediu/Înalt/Critic) și o analiză explicativă (analysis). " +
-                        "Răspunde exclusiv în limba română și furnizează DOAR obiectul JSON, fără explicații suplimentare în afara JSON-ului. \n"
-        );
-        sb.append("<|end|>\n");
-
-        sb.append("<|user|>\n");
-        sb.append("Analizează următorul caz medical și generează obiectul JSON:\n");
-        sb.append("Vârstă: ").append(age).append(" ani, ");
-        sb.append("Sex: ").append(gender).append(", ");
-        sb.append("Tensiune Arterială: ").append(tensiune).append(" mmHg, ");
-        sb.append("Colesterol: ").append(cholesterolStatus).append(", ");
-        sb.append("Fumător: ").append(smokerStatus).append(".\n");
-
-        sb
-                .append("Simptome Acute: ")
-                .append(observation.getSymptomsDescription())
-                .append(".\n");
-        sb
-                .append("Istoric Medical: ")
-                .append(medicalHistory)
-                .append(".\n");
-        sb.append("<|end|>\n");
-
-        sb.append("<|assistant|>\n");
-        // Aici LLM-ul va trebui să răspundă direct cu JSON
+        sb.append("Analizează cazul medical și furnizează răspunsul în format JSON, conform schemei specificate. Răspunde exclusiv în limba română. Diagnoza (diagnosis) și analiza (analysis) trebuie să fie concise și bazate pe fapte.\n\n");
+        sb.append("Date Pacient:\n");
+        sb.append("- Vârstă: ").append(age).append(" ani\n");
+        sb.append("- Sex: ").append(gender).append("\n");
+        sb.append("- Tensiune Arterială: ").append(tensiune).append(" mmHg\n");
+        sb.append("- Colesterol: ").append(cholesterolStatus).append("\n");
+        sb.append("- Fumător: ").append(smokerStatus).append("\n");
+        sb.append("Simptome Acute: ").append(observation.getSymptomsDescription()).append("\n");
+        sb.append("Istoric Medical: ").append(medicalHistory).append("\n");
 
         return sb.toString();
     }
