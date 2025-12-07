@@ -26,13 +26,11 @@ public class ReportGenerationServiceImpl implements ReportGenerationService {
     public ObservationReport generateReport(Observation observation) {
         String llmOutput = llmClient.generateReport("Generare raport simplu.");
 
-        // Folosește constructorul implicit și settere (logica alternativă)
         ObservationReport report = new ObservationReport();
 
         report.setObservation(observation);
         report.setReportContent(llmOutput);
 
-        // Populează câmpurile adăugate manual
         report.setPatientName(
             observation.getPatient() != null
                 ? observation.getPatient().getFirstName() +
