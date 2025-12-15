@@ -35,8 +35,6 @@ public class Doctor {
         this.lastName = lastName;
     }
 
-    // --- Getters & Setters ---
-
     public Long getId() {
         return id;
     }
@@ -45,7 +43,6 @@ public class Doctor {
         this.id = id;
     }
 
-    // Metodă necesară pentru DoctorDetailsService
     public String getCode() {
         return code;
     }
@@ -54,7 +51,6 @@ public class Doctor {
         this.code = code;
     }
 
-    // Metodă necesară pentru LLMReportGenerationService și ReportGenerationServiceImpl
     public String getFirstName() {
         return firstName;
     }
@@ -63,7 +59,6 @@ public class Doctor {
         this.firstName = firstName;
     }
 
-    // Metodă necesară pentru LLMReportGenerationService și ReportGenerationServiceImpl
     public String getLastName() {
         return lastName;
     }

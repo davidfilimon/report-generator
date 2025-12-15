@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports History - GMR</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="logo">🫀 GMR</div>
+        <div class="nav-right">
+            <span class="doctor-badge" id="doctorName">👨‍⚕️ Loading...</span>
+            <a href="/dashboard.html" class="nav-link">← Dashboard</a>
+            <a href="/login.html" onclick="logout()" class="btn btn-secondary-small">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Reports History Section -->
+<section class="dashboard-section">
+    <div class="dashboard-container">
+        <div class="page-header">
+            <h1>📚 Reports History</h1>
+            <p class="subtitle">View and manage all your cardiac assessment reports</p>
+        </div>
+
+        <!-- Search & Filter Bar -->
+        <div class="search-filter-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search by patient name, ID, or diagnosis..."
+                        class="search-input"
+                >
+            </div>
+
+            <div class="filter-group">
+                <select id="filterRisk" class="filter-select">
+                    <option value="">All Risk Levels</option>
+                    <option value="low">Low Risk</option>
+                    <option value="moderate">Moderate Risk</option>
+                    <option value="high">High Risk</option>
+                </select>
+
+                <select id="filterDate" class="filter-select">
+                    <option value="">All Dates</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                </select>
+
+                <button class="btn btn-secondary-small" onclick="resetFilters()">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-info">
+                    <h3 id="totalReports">0</h3>
+                    <p>Total Reports</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <h3 id="lowRiskCount">0</h3>
+                    <p>Low Risk</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-info">
+                    <h3 id="moderateRiskCount">0</h3>
+                    <p>Moderate Risk</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🚨</div>
+                <div class="stat-info">
+                    <h3 id="highRiskCount">0</h3>
+                    <p>High Risk</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Table -->
+        <div class="reports-table-container">
+            <table class="reports-table" id="reportsTable">
+                <thead>
+                <tr>
+                    <th>Report ID</th>
+                    <th>Patient Name</th>
+                    <th>Age</th>
+                    <th>Date</th>
+                    <th>Risk Level</th>
+                    <th>Heart Rate</th>
+                    <th>Blood Pressure</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="reportsTableBody">
+                <tr>
+                    <td colspan="8" class="loading-cell">
+                        <div class="loading-spinner">⏳ Loading reports...</div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">📭</div>
+                <h3>No Reports Found</h3>
+                <p>You haven't created any reports yet, or no reports match your filters.</p>
+                <a href="/new-report.html" class="btn btn-primary">
+                    ➕ Create First Report
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+    let allReports = [];
+    let filteredReports = [];
+
+    // Verificare autentificare și încărcare rapoarte
+    async function initReportsHistory() {
+        try {
+            const response = await fetch('http://localhost:8080/api/reports/history', {
+                credentials: 'include'
+            });
+
+            if (response.status === 403 || response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const data = await response.json();
+            console.log('Reports history response:', data);
+
+            // Setăm numele doctorului
+            if (data && data.doctorCode) {
+                const doctorBadge = document.getElementById('doctorName');
+                if (doctorBadge) {
+                    doctorBadge.textContent = `👨‍⚕️ Dr. ${data.doctorCode}`;
+                }
+            }
+
+            // Încărcăm rapoartele
+            if (data.reports && data.reports.length > 0) {
+                console.log('Loading', data.reports.length, 'reports');
+                loadReports(data.reports);
+            } else {
+                console.log('No reports found, showing empty state');
+                loadReports([]);
+            }
+
+        } catch (err) {
+            console.error('Error loading reports history:', err);
+            // Nu redirectăm automat, doar afișăm empty state
+            loadReports([]);
+        }
+    }
+
+    function loadReports(reports) {
+        allReports = reports;
+        filteredReports = reports;
+
+        updateStats();
+        renderReportsTable();
+    }
+
+    function updateStats() {
+        document.getElementById('totalReports').textContent = allReports.length;
+        document.getElementById('lowRiskCount').textContent =
+            allReports.filter(r => r.riskLevel === 'low').length;
+        document.getElementById('moderateRiskCount').textContent =
+            allReports.filter(r => r.riskLevel === 'moderate').length;
+        document.getElementById('highRiskCount').textContent =
+            allReports.filter(r => r.riskLevel === 'high').length;
+    }
+
+    function renderReportsTable() {
+        const tbody = document.getElementById('reportsTableBody');
+        const emptyState = document.getElementById('emptyState');
+
+        if (filteredReports.length === 0) {
+            tbody.innerHTML = '';
+            emptyState.style.display = 'flex';
+            return;
+        }
+
+        emptyState.style.display = 'none';
+
+        tbody.innerHTML = filteredReports.map(report => {
+            // Asigură-te că avem valorile necesare
+            const reportId = report.id || report.observationId || 'N/A';
+            const patientName = report.patientName || 'Unknown Patient';
+            const age = report.age || 'N/A';
+            const date = report.date || new Date().toISOString();
+            const riskLevel = report.riskLevel || 'low';
+            const heartRate = report.heartRate || 'N/A';
+            const systolicBP = report.systolicBP || 'N/A';
+            const diastolicBP = report.diastolicBP || 'N/A';
+
+            return `
+                <tr class="report-row">
+                    <td><strong>#${reportId}</strong></td>
+                    <td>${patientName}</td>
+                    <td>${age}</td>
+                    <td>${formatDate(date)}</td>
+                    <td>
+                        <span class="risk-badge-small risk-${riskLevel}">
+                            ${riskLevel.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${heartRate} bpm</td>
+                    <td>${systolicBP}/${diastolicBP} mmHg</td>
+                    <td class="action-buttons">
+                        <button class="btn-icon" onclick="viewReport(${reportId})" title="View Report">
+                            👁️
+                        </button>
+                        <button class="btn-icon" onclick="downloadReport(${reportId})" title="Download PDF">
+                            📥
+                        </button>
+                        <button class="btn-icon btn-delete" onclick="deleteReport(${reportId})" title="Delete">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function formatDate(dateStr) {
+        const date = new Date(dateStr);
+        const today = new Date();
+        const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        applyFilters();
+    });
+
+    // Filter functionality
+    document.getElementById('filterRisk').addEventListener('change', applyFilters);
+    document.getElementById('filterDate').addEventListener('change', applyFilters);
+
+    function applyFilters() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const riskFilter = document.getElementById('filterRisk').value;
+        const dateFilter = document.getElementById('filterDate').value;
+
+        filteredReports = allReports.filter(report => {
+            // Search filter
+            const matchesSearch = !searchTerm ||
+                (report.patientName && report.patientName.toLowerCase().includes(searchTerm)) ||
+                (report.id && report.id.toString().toLowerCase().includes(searchTerm)) ||
+                (report.diagnosis && report.diagnosis.toLowerCase().includes(searchTerm));
+
+            // Risk filter
+            const matchesRisk = !riskFilter || report.riskLevel === riskFilter;
+
+            // Date filter
+            const matchesDate = filterByDate(report.date, dateFilter);
+
+            return matchesSearch && matchesRisk && matchesDate;
+        });
+
+        renderReportsTable();
+    }
+
+    function filterByDate(reportDate, filter) {
+        if (!filter) return true;
+
+        const date = new Date(reportDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        switch(filter) {
+            case 'today':
+                return date >= today;
+            case 'week':
+                const weekAgo = new Date(today);
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                return date >= weekAgo;
+            case 'month':
+                const monthAgo = new Date(today);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                return date >= monthAgo;
+            case 'year':
+                const yearAgo = new Date(today);
+                yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+                return date >= yearAgo;
+            default:
+                return true;
+        }
+    }
+
+    function resetFilters() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('filterRisk').value = '';
+        document.getElementById('filterDate').value = '';
+        applyFilters();
+    }
+
+    function viewReport(observationId) {
+        // Redirectăm către pagina de vizualizare raport
+        window.location.href = `/view-report.html?observationId=${observationId}`;
+    }
+
+    function downloadReport(reportId) {
+        alert(`📥 Download functionality for ${reportId} - Coming soon!`);
+    }
+
+    async function deleteReport(observationId) {
+    if (!confirm(`Are you sure you want to delete observation #${observationId}?`)) {
+        return;
+    }
+
+    try {
+        console.log('Deleting observation:', observationId);
+
+        const response = await fetch(`http://localhost:8080/api/reports/observation/${observationId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            alert('✅ ' + data.message);
+
+            // Reîncarcă lista de rapoarte
+            initReportsHistory();
+        } else {
+            const error = await response.json();
+            alert('❌ ' + (error.message || 'Error deleting observation'));
+        }
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error deleting observation');
+    }
+}
+
+    function logout() {
+        localStorage.clear();
+        window.location.href = '/login.html';
+    }
+
+
+    initReportsHistory();
+</script>
+</body>
+</html>

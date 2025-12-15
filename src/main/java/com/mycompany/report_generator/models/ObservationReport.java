@@ -6,6 +6,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.util.List;
+import java.util.ArrayList;
+import jakarta.persistence.ElementCollection;
+
 
 @Entity
 @Builder
@@ -32,4 +36,11 @@ public class ObservationReport {
     private String riskLevel;
 
     private LocalDateTime generationDate = LocalDateTime.now();
+
+    @Column(columnDefinition = "TEXT")
+    private String observationSummary;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    private List<String> riskFactors = new ArrayList<>();
+
 }

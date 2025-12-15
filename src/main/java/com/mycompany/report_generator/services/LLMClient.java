@@ -10,10 +10,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import java.io.IOException;
 
-/**
- * Client pentru interacțiunea cu modelul Google Gemini via API REST,
- * folosind Structured Output (Schema JSON).
- */
 @Component
 public class LLMClient {
 
@@ -78,7 +74,6 @@ public class LLMClient {
             return "Eroare internă la construirea cererii LLM.";
         }
 
-        // 3. Efectuează cererea către Gemini
         Mono<String> responseMono = webClient.post()
                 .header("Content-Type", "application/json")
                 .bodyValue(payloadString)

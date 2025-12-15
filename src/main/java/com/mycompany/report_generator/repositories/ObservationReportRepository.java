@@ -13,8 +13,8 @@ public interface ObservationReportRepository extends JpaRepository<ObservationRe
 
     List<ObservationReport> findByObservationPatientId(Long patientId);
 
-    @Transactional // Marchează metoda ca operație de modificare a bazei de date
-    void deleteByObservationId(Long observationId); // Schimbat la 'void' și Long
+    @Transactional
+    void deleteByObservationId(Long observationId);
 
     Optional<ObservationReport> findFirstByObservationPatientIdOrderByGenerationDateDesc(Long patientId);
 

@@ -20,11 +20,10 @@ public class LLMReportGenerationService implements ReportGenerationService {
     private final ObservationReportRepository reportRepository;
     private final Gson gson = new Gson();
 
-    // NOU: Structură plată, simplă, care se potrivește cu schema JSON trimisă către Gemini
     private static class LLMResponse {
-        String diagnosis;   // Diagnoză potențială (String)
-        String riskLevel;   // Nivel de risc (Scăzut, Mediu, Înalt, Critic) (String)
-        String analysis;    // Analiza explicativă (devine reportContent) (String)
+        String diagnosis;
+        String riskLevel;
+        String analysis;
     }
 
     public LLMReportGenerationService(
@@ -39,7 +38,6 @@ public class LLMReportGenerationService implements ReportGenerationService {
     @Transactional
     public ObservationReport generateReport(Observation observation) {
 
-        // UPSERT: Ștergem raportul vechi înainte de a salva unul nou.
         if (observation.getId() != null) {
             reportRepository.deleteByObservationId(observation.getId());
         }
@@ -57,10 +55,8 @@ public class LLMReportGenerationService implements ReportGenerationService {
                     .build();
         }
 
-        // Răspunsul LLM este garantat a fi un String JSON pur (grație Gemini Structured Output)
         String jsonOutput = llmClient.generateReport(inputPrompt);
 
-        // Verificăm dacă LLMClient a raportat o eroare (ex: cheie API lipsă sau eroare de rețea)
         if (jsonOutput.startsWith("Eroare")) {
             return ObservationReport.builder()
                     .patientName("Eroare API")
@@ -75,10 +71,8 @@ public class LLMReportGenerationService implements ReportGenerationService {
         LLMResponse llmResponse;
 
         try {
-            // Parsare directă și simplă, fără manipularea String-urilor
             llmResponse = gson.fromJson(jsonOutput, LLMResponse.class);
 
-            // Verificare critică de integritate
             if (llmResponse == null || llmResponse.analysis == null || llmResponse.diagnosis == null || llmResponse.riskLevel == null) {
                 throw new IllegalStateException("Gemini a returnat JSON incomplet, deși schema a fost solicitată.");
             }
@@ -106,21 +100,19 @@ public class LLMReportGenerationService implements ReportGenerationService {
                 ? observation.getDoctor().getFirstName() + " " + observation.getDoctor().getLastName()
                 : "Doctor Necunoscut";
 
-        // Creează entitatea ObservationReport folosind datele structurate
         ObservationReport report = ObservationReport.builder()
                 .observation(observation)
-                .reportContent(llmResponse.analysis) // Analiza explicativă
+                .reportContent(llmResponse.analysis)
                 .patientName(patientFullName)
                 .doctorName(doctorFullName)
-                .potentialDiagnosis(llmResponse.diagnosis) // Diagnoza extrasă
-                .riskLevel(llmResponse.riskLevel) // Nivelul de risc extras
+                .potentialDiagnosis(llmResponse.diagnosis)
+                .riskLevel(llmResponse.riskLevel)
                 .generationDate(LocalDateTime.now())
                 .build();
 
         return reportRepository.save(report);
     }
 
-    // --- Logica de Construire Prompt - Simplificată ---
 
     private String buildPromptFromObservation(Observation observation) {
         int age = 0;

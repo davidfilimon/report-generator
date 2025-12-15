@@ -13,6 +13,9 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -22,62 +25,79 @@ public class SecurityConfig {
     private final JwtRequestFilter jwtRequestFilter;
 
     public SecurityConfig(
-        DoctorDetailsService doctorDetailsService,
-        JwtRequestFilter jwtRequestFilter
+            DoctorDetailsService doctorDetailsService,
+            JwtRequestFilter jwtRequestFilter
     ) {
         this.doctorDetailsService = doctorDetailsService;
         this.jwtRequestFilter = jwtRequestFilter;
     }
 
-    // 1. Definim PasswordEncoder pentru a accepta {noop}
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // DelegatingPasswordEncoder acceptă {noop}, asigurând compatibilitatea cu DoctorDetailsService
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
-    // 2. AuthenticationManager este necesar pentru a procesa cererea de login
     @Bean
     public AuthenticationManager authenticationManager(
-        AuthenticationConfiguration authenticationConfiguration
+            AuthenticationConfiguration authenticationConfiguration
     ) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    // 3. Configurația pentru a lega DoctorDetailsService și PasswordEncoder
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider =
-            new DaoAuthenticationProvider();
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(doctorDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
 
-    // 4. Configurația Filter Chain (reguli de autorizare)
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http)
-        throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(authz ->
-                authz
-                    // Permitem accesul neautentificat la endpoint-ul de login
-                    .requestMatchers("/api/auth/login")
-                    .permitAll()
-                    // Toate celelalte cereri necesită autentificare
-                    .anyRequest()
-                    .authenticated()
-            )
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            // Adăugăm filtrul JWT
-            .addFilterBefore(
-                jwtRequestFilter,
-                UsernamePasswordAuthenticationFilter.class
-            );
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(authz ->
+                        authz
+                                .requestMatchers("/api/auth/login").permitAll()
+                                .requestMatchers(
+                                        "/",
+                                        "/index.html",
+                                        "/login.html",
+                                        "/css/**",
+                                        "/js/**",
+                                        "/images/**"
+                                ).permitAll()
+                                .requestMatchers(
+                                        "/dashboard.html",
+                                        "/new-report.html",
+                                        "/report.html",
+                                        "/view-report.html"
+                                ).authenticated()
+                                .requestMatchers("/api/**").authenticated()
+                                .anyRequest().authenticated()
+                )
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .addFilterBefore(
+                        jwtRequestFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(java.util.Arrays.asList("http://localhost:8080"));
+        configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(java.util.Arrays.asList("*"));
+        configuration.setAllowCredentials(true); // TRUE for cookies!
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

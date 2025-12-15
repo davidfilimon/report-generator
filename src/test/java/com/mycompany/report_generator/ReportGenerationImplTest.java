@@ -51,7 +51,6 @@ class ReportGenerationServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // Initializează datele standard
         standardPatient = new Patient();
         standardPatient.setFirstName("John");
         standardPatient.setLastName("Doe");
@@ -144,7 +143,7 @@ class ReportGenerationServiceImplTest {
                     System.err.printf("Eroare la cererea #%d: %s\n", requestId, e.getMessage());
                     failureCounter.incrementAndGet();
                 } finally {
-                    latch.countDown(); // Marchează cererea ca finalizată
+                    latch.countDown();
                 }
             });
         }
@@ -158,7 +157,6 @@ class ReportGenerationServiceImplTest {
         System.out.printf("Cereri Eșuate: %d\n", failureCounter.get());
         System.out.printf("Timp Expirat (Timeout): %s\n", allFinished ? "Nu" : "Da");
 
-        // 3. Verificarea Assertions
         assertTrue(allFinished,
                 String.format("Stress testul a expirat după %d secunde. Număr de cereri rămase: %d", TIMEOUT_SECONDS, latch.getCount()));
 
@@ -168,7 +166,6 @@ class ReportGenerationServiceImplTest {
         assertEquals(0, failureCounter.get(),
                 "Nu ar trebui să existe erori în timpul execuției concurente.");
 
-        // 4. Verificarea interacțiunilor Mockito (totalul apelurilor)
         verify(mockLlmClient, times(TOTAL_REQUESTS)).generateReport(anyString());
         verify(mockReportRepository, times(TOTAL_REQUESTS)).save(any(ObservationReport.class));
     }

@@ -42,7 +42,6 @@ public class Observation {
 
     private LocalDateTime observationDate = LocalDateTime.now();
 
-    // Constructor custom pentru service/controller, care folosește Map<String, String>
     public Observation(
             Patient patient,
             Doctor doctor,
