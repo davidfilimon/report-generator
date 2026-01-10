@@ -4,6 +4,12 @@ This is a Spring Boot service designed to automate medical reporting by leveragi
 
 ---
 
+<img width="1138" height="1008" alt="poza1" src="https://github.com/user-attachments/assets/80cef9b2-1b01-4608-8b8c-6920a655a427" />
+<img width="1139" height="753" alt="poza2" src="https://github.com/user-attachments/assets/54950255-f456-4bf0-ba35-4b641948174f" />
+<img width="697" height="924" alt="poza3" src="https://github.com/user-attachments/assets/3c5b33b6-dacd-4519-b567-9239a9450ca8" />
+<img width="882" height="981" alt="poza4" src="https://github.com/user-attachments/assets/d4851e93-595c-4bf3-8225-511fd826eb87" />
+<img width="967" height="789" alt="poza5" src="https://github.com/user-attachments/assets/006370f1-68a9-454c-b4b5-fb6109976517" />
+
 ## Key Features
 
 * **AI-Driven Analysis**: Integrates with LLM clients to provide intelligent clinical reasoning based on patient data.
